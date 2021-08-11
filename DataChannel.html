@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DataChannel simple example</title>
+</head>
+<body>
+<textarea rows="5" cols="50" id="dataChannelSend" disabled placeholder="1: Press Start; 2: Enter text; 3: Press Send."></textarea>
+<textarea rows="5" cols="50" id="dataChannelReceive" disabled></textarea>
+<div id="buttons">
+  <button id="startButton">Start</button>
+  <button id="sendButton">Send</button>
+  <button id="closeButton">Stop</button>
+</div>
+<script type="text/javascript">
+  var startBtn = document.getElementById("startButton");
+  var sendBtn = document.getElementById("sendButton");
+  var closeBtn = document.getElementById("closeButton");
+
+  startBtn.disabled = false;
+  sendBtn.disabled = true;
+  closeBtn.disabled = true;
+
+  var dataChannelSend = document.getElementById("dataChannelSend");
+  var dataChannelReceive = document.getElementById("dataChannelReceive");
+
+  var localRTCPeerConnection;
+  var remoteRTCPeerConnection;
+
+  var localDataChannel;
+  var remoteDataChannel;
+
+  startBtn.onclick = createConnection;
+  sendBtn.onclick  = sendData;
+  closeBtn.onclick = close;
+
+  function createConnection() {
+
+    localRTCPeerConnection = new RTCPeerConnection();
+    remoteRTCPeerConnection = new RTCPeerConnection();
+
+    localRTCPeerConnection.onicecandidate = getLocalCandidate;
+    remoteRTCPeerConnection.onicecandidate = getRemoteCandidate;
+
+    localDataChannel = localRTCPeerConnection.createDataChannel("localDataChannel");
+    //????
+    //remoteDataChannel = remoteRTCPeerConnection.createDataChannel("remoteDataChannel");
+    //remoteDataChannel.onmessage = handleMessage;
+    remoteRTCPeerConnection.ondatachannel = gotReceiveChannel;
+
+    localDataChannel.onopen = handleSendChannelStateChange;
+    localDataChannel.onclose = handleSendChannelStateChange;
+
+
+
+    localRTCPeerConnection.createOffer().then(function (offer) {
+      localRTCPeerConnection.setLocalDescription(offer);
+      remoteRTCPeerConnection.setRemoteDescription(offer);
+
+      remoteRTCPeerConnection.createAnswer().then(function (answer) {
+        localRTCPeerConnection.setRemoteDescription(answer);
+        remoteRTCPeerConnection.setLocalDescription(answer);
+      });
+    });
+    startBtn.disabled = true;
+    sendBtn.disabled = false;
+    closeBtn.disabled = false;
+
+  }
+
+  function gotReceiveChannel(event) {
+    remoteDataChannel = event.channel;
+    console.log(remoteDataChannel==localDataChannel);
+    remoteDataChannel.onmessage = handleMessage;
+
+  }
+  function handleMessage(event) {
+    console.log(event.data);
+    dataChannelReceive.value = event.data;
+  }
+
+  function handleSendChannelStateChange() {
+    var readyState = localDataChannel.readyState;
+
+    if (readyState == "open") {
+      dataChannelSend.disabled = false;
+      dataChannelSend.focus();
+      dataChannelSend.placeholder = "";
+
+    } else {
+      // event MUST be 'close', if we are here...
+      // Disable 'Send' text area
+      dataChannelSend.disabled = true;
+
+    }
+
+  }
+  function getLocalCandidate(event) {
+    remoteRTCPeerConnection.addIceCandidate(event.candidate);
+  }
+
+  function getRemoteCandidate(event) {
+    localRTCPeerConnection.addIceCandidate(event.candidate);
+
+  }
+
+  function sendData() {
+    var data = dataChannelSend.value;
+    console.log(data);
+    localDataChannel.send(data);
+  }
+
+  function close() {
+
+    remoteDataChannel.close();
+
+    localDataChannel.close();
+
+
+    // Close peer connections
+    localRTCPeerConnection.close();
+    remoteRTCPeerConnection.close();
+
+    // Reset local variables
+    localRTCPeerConnection = null;
+    remoteRTCPeerConnection = null;
+
+    startBtn.disabled = false;
+    sendBtn.disabled = true;
+    closeBtn.disabled = true;
+    dataChannelSend.value = "";
+    dataChannelReceive.value = "";
+    dataChannelSend.disabled = true;
+    dataChannelSend.placeholder = "1: Press Start; 2: Enter text; 3: Press Send.";
+  }
+</script>
+</body>
+</html>

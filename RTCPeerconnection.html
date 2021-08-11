@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Local PeerConnection() example</title>
+</head>
+<body>
+<table border="1" width="100%">
+  <tr>
+    <th>Local video</th>
+    <th>'Remote' video</th>
+  </tr>
+  <tr>
+    <td><video id="localVideo" autoplay></video></td>
+    <td><video id="remoteVideo" autoplay></video></td>
+  </tr>
+  <tr>
+    <td align="center">
+      <div>
+        <button id="startButton">Start</button>
+        <button id="callButton">Call</button>
+        <button id="hangupButton">Hang Up</button>
+      </div>
+    </td>
+    <td><!-- void --></td>
+  </tr>
+</table>
+<script type="text/javascript">
+  var startBtn = document.getElementById("startButton");
+  var callBtn = document.getElementById("callButton");
+  var hangupBtn = document.getElementById("hangupButton");
+
+  startBtn.disabled = false;
+  callBtn.disabled = true;
+  hangupBtn.disabled = true;
+
+  var localVideo = document.getElementById("localVideo");
+  var remoteVideo = document.getElementById("remoteVideo");
+
+  var localStream;
+  var remoteStream = new MediaStream;
+
+  var localRTCPeerconnection;
+  var remoteRTCPeerconnection;
+
+  var j =0;
+  startBtn.onclick = function () {
+
+    var cons = {
+      video: {
+        width:400,
+        height:300
+      },
+      audio:true
+    };
+    navigator.getUserMedia(cons,sucessCallBack,errorCallBack);
+  };
+
+  function sucessCallBack(localStream) {
+    console.log(j++);
+    console.log("get localStream");
+    //console.log(localStream);
+
+    window.localStream = localStream;
+    localVideo.srcObject = localStream;
+    startBtn.disabled = true;
+    callBtn.disabled = false;
+    hangupBtn.disabled = true;
+  }
+
+  function errorCallBack(error) {
+    console.error("getUserMedia error:"+error);
+  }
+
+  callBtn.onclick = function () {
+
+    console.log(j++);
+    console.log("cteate localRTCPeerconnection and remoteRTCPeerconnection ");
+    localRTCPeerconnection = new RTCPeerConnection(null);
+    remoteRTCPeerconnection = new RTCPeerConnection(null);
+
+    console.log(j++);
+    console.log("create listener to remote");
+    remoteRTCPeerconnection.addEventListener('track',getTracks );
+
+    var tracks = localStream.getTracks();
+    for (var i = 0; i < tracks.length; i++) {
+      console.log(j++);
+      console.log("add tracks to localRTCPeerconnection");
+     // console.log(tracks[i]);
+      cnWait(2);
+      localRTCPeerconnection.addTrack(tracks[i]);
+    }
+
+
+    //要放最后？？？
+    localRTCPeerconnection.createOffer().then(function(offer) {
+      console.log(j++);
+      console.log("set local des and create offer to remote");
+      remoteRTCPeerconnection.setRemoteDescription(offer);
+      localRTCPeerconnection.setLocalDescription(offer);
+
+      remoteRTCPeerconnection.createAnswer().then(function (answer) {
+        console.log(j++);
+        console.log("set remote and create answer to local");
+        localRTCPeerconnection.setRemoteDescription(answer);
+        remoteRTCPeerconnection.setLocalDescription(answer);
+
+      });
+    });
+
+    localRTCPeerconnection.onicecandidate = getLocalIceCandidate;
+    remoteRTCPeerconnection.onicecandidate = getRemoteIceCandidate;
+
+    callBtn.disabled = true;
+    hangupBtn.disabled = false;
+
+  };
+
+  function getTracks(event) {
+    console.log(j++);
+    console.log("add tracks to remote");
+    remoteStream.addTrack(event.track);
+    remoteVideo.srcObject = remoteStream;
+  }
+  function getLocalIceCandidate(event) {
+    console.log(j++);
+    console.log("local icecandidate:");
+    //console.log(event.icecandidate);
+    remoteRTCPeerconnection.addIceCandidate(event.candidate);
+  }
+
+  function getRemoteIceCandidate(event) {
+    console.log(j++);
+    console.log("remote icecandidate:");
+    //console.log(event.candidate);
+    localRTCPeerconnection.addIceCandidate(event.candidate);
+
+  }
+
+  hangupBtn.onclick = function () {
+
+    remoteVideoClear();
+
+    localRTCPeerconnection.close();
+    remoteRTCPeerconnection.close();
+
+    remoteRTCPeerconnection.removeEventListener("track",getTracks);
+
+    localVideo.srcObject = null;
+    remoteVideo.srcObject = null;
+
+    localRTCPeerconnection = null;
+    remoteRTCPeerconnection = null;
+
+    startBtn.disabled = false;
+    callBtn.disabled = true;
+    hangupBtn.disabled = true;
+
+  };
+  function remoteVideoClear() {
+    var tracks = remoteStream.getTracks();
+    for (var i = 0; i < tracks.length; i++) {
+      remoteStream.removeTrack(tracks[i]);
+    }
+  }
+  function cnWait (second){
+    var startTime,endTimes,s;
+    var d=new Date();
+    startTime=d.getTime();
+    while(true){
+      d=new Date();
+      endTimes=d.getTime();
+      s = (endTimes-startTime)/1000;
+      if (s >= second)
+        break;
+    }
+  }
+</script>
+</body>
+</html>
